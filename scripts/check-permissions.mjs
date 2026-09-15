@@ -1,0 +1,37 @@
+import assert from 'node:assert/strict';
+import {matchesRecipe,mealAt} from '../lib/types.ts';
+const root='http://127.0.0.1:8788',run=Date.now().toString(36),a='test_a_'+run,b='test_b_'+run,c='test_c_'+run;
+let checks=0;
+async function req(user,body,status=200){const headers={};if(user){headers['oai-authenticated-user-id']=user;headers['oai-authenticated-user-email']=user+'@example.test';}if(body)headers['Content-Type']='application/json';const res=await fetch(root+'/api/hub',{method:body?'POST':'GET',headers,body:body?JSON.stringify(body):undefined});const data=await res.json();assert.equal(res.status,status,JSON.stringify(data));checks++;return data;}
+for(const user of [a,b,c])await req(user,{action:'profile',username:user,name:user});
+await req(null,{action:'createKitchen',name:'Test kitchen'},401);
+const k1=(await req(a,{action:'createKitchen',name:'Test kitchen one'},201)).id;
+const k2=(await req(a,{action:'createKitchen',name:'Test kitchen two'},201)).id;
+await req(a,{action:'addMember',kitchenId:k1,identifier:b.toUpperCase()+'@EXAMPLE.TEST'});
+await req(c,{action:'addMember',kitchenId:k1,identifier:c},403);
+let recipe={id:'',revision:0,title:'Test chicken bowl',description:'A vegetarian alternative with chickpeas.',course:'Dinner',cuisine:'Italian',tags:'Family favourite',ingredients:[{amount:'1',unit:'cup',name:'chickpeas'}],steps:['Cook and serve.'],prep:10,cook:20,servings:2,visibility:'private',kitchenIds:[],image:''};
+const rid=(await req(a,{action:'saveRecipe',recipe},201)).id;
+assert(!(await req(null)).recipes.some(r=>r.id===rid));assert(!(await req(b)).recipes.some(r=>r.id===rid));checks+=2;
+recipe=(await req(a)).recipes.find(r=>r.id===rid);
+await req(c,{action:'saveRecipe',recipe:{...recipe,title:'Unauthorized edit'}},403);
+await req(a,{action:'saveRecipe',recipe:{...recipe,visibility:'kitchen',kitchenIds:['missing-kitchen']}},403);
+await req(a,{action:'saveRecipe',recipe:{...recipe,visibility:'kitchen',kitchenIds:[]}},400);
+await req(a,{action:'saveRecipe',recipe:{...recipe,visibility:'kitchen',kitchenIds:[k1]}});
+assert((await req(b)).recipes.some(r=>r.id===rid));assert(!(await req(c)).recipes.some(r=>r.id===rid));assert(!(await req(null)).recipes.some(r=>r.id===rid));checks+=3;
+await req(a,{action:'saveRecipe',recipe},409);
+recipe=(await req(a)).recipes.find(r=>r.id===rid);
+await req(a,{action:'saveRecipe',recipe:{...recipe,title:'Updated recipe'}});
+assert((await req(b)).recipes.some(r=>r.id===rid));checks++;
+recipe=(await req(a)).recipes.find(r=>r.id===rid);
+await req(a,{action:'saveRecipe',recipe:{...recipe,kitchenIds:[k2]}});
+assert(!(await req(b)).recipes.some(r=>r.id===rid));checks++;
+recipe=(await req(a)).recipes.find(r=>r.id===rid);
+await req(a,{action:'saveRecipe',recipe:{...recipe,visibility:'public',kitchenIds:[k1]}});
+assert((await req(null)).recipes.some(r=>r.id===rid));assert((await req(b)).recipes.find(r=>r.id===rid).kitchenIds.includes(k1));checks+=2;
+recipe=(await req(a)).recipes.find(r=>r.id===rid);
+await req(a,{action:'saveRecipe',recipe:{...recipe,visibility:'private'}});
+assert(!(await req(b)).recipes.some(r=>r.id===rid));assert(!(await req(null)).recipes.some(r=>r.id===rid));assert.equal((await req(a)).recipes.find(r=>r.id===rid).kitchenIds.length,0);checks+=3;
+for(const q of ['chickpeas','VEGETARIAN','Italian','family']){assert(matchesRecipe(recipe,q));checks++;}
+assert(!matchesRecipe(recipe,'nonexistent'));assert.equal(mealAt(8),'Breakfast');assert.equal(mealAt(13),'Lunch');assert.equal(mealAt(19),'Dinner');checks+=4;
+const csrf=await fetch(root+'/api/hub',{method:'POST',headers:{'Content-Type':'application/json','Origin':'https://other.example'},body:'{}'});assert.equal(csrf.status,403);checks++;
+console.log(checks+' checks passed: identity, ownership, membership, persistent shares, revocation, search, meal time, conflicts and cross-site writes.');
