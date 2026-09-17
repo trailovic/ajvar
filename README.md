@@ -4,7 +4,7 @@ A family recipe hub built with React, Vinext, Cloudflare Workers and D1.
 
 ## Features
 
-- Sign in with ChatGPT and choose a unique Ajvar username.
+- Sign in with an eight-digit email code and choose a unique Ajvar username. Supabase manages authentication; Brevo delivers codes.
 - Create kitchens and add existing Ajvar accounts by username or account email.
 - Create and edit recipes with ingredient rows, ordered steps, meal course, cuisine, tags, cooking times, servings and an optional HTTPS photo URL.
 - Keep recipes private, share with selected kitchens, or publish them to Home. Public recipes may also belong to selected kitchens.
@@ -14,23 +14,27 @@ A family recipe hub built with React, Vinext, Cloudflare Workers and D1.
 
 ## Account and access model
 
-Sites owns authentication and injects verified identity headers. The application uses stable Site user IDs, not client-supplied identity or email, for ownership. Only the recipe author can edit a recipe or its sharing settings. Kitchen membership is checked on the server. Private responses are never cached.
+The browser uses the Supabase client for email verification and session refresh. Each API request carries its access token; the Worker verifies it with Supabase getUser and requires a confirmed email. Identity mappings retain stable Ajvar profile IDs. On first verified email sign-in, an existing profile with the same email is linked once, preserving recipes and kitchens. A second Supabase identity cannot claim a previously linked profile. In email mode, platform identity headers are ignored. Only the recipe author can edit a recipe or its sharing settings. Kitchen membership is checked on the server. Private responses are never cached.
 
-Adding a member requires an existing Ajvar profile. All kitchen members may add another registered member. Adding someone does not send an email. Account email comes from ChatGPT sign-in and is only returned to its owner; usernames and display names appear to fellow kitchen members.
+Adding a member requires an existing Ajvar profile. All kitchen members may add another registered member. Adding someone does not send an email. Account email comes from verified Supabase identity and is only returned to its owner; usernames and display names appear to fellow kitchen members.
 
 ## Storage
 
-D1 stores accounts, kitchens, members, recipes and recipe shares. Generated schema migrations live under drizzle/. Production data is independent of the local preview database. Local test accounts and recipes are never seeded into production.
+D1 stores accounts, external identity mappings, kitchens, members, recipes and recipe shares. Generated schema migrations live under drizzle/. Production data is independent of the local preview database. Local test accounts and recipes are never seeded into production.
 
 ## Development
 
-Use Node 22.13 or later, the committed package-lock.json, and npm run dev. The portable preview supports a local-only simulated sign-in as Seedy. Production authentication always remains owned by Sites.
+Use Node 22.13 or later, the committed package-lock.json, and npm run dev. The portable preview supports a local-only simulated sign-in as Seedy. When SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY are configured, email auth replaces the simulated/legacy login. The public runtime configuration endpoint exposes only the Supabase URL and publishable key. Never configure a Supabase secret/service-role key in this app. Store Brevo SMTP credentials only in Supabase Auth settings. Without both auth settings, the original Sites login remains as a deployment fallback.
 
 Generate migrations with npm run db:generate after changing db/schema.ts. Build with npm run build. Apply new local migrations through Wrangler using the built dist/server/wrangler.json configuration and .wrangler/state persistence directory.
 
+## Email configuration
+
+Copy .env.example to .env.local for local auth settings. Set production runtime values through Sites. Supabase Site URL must be the Ajvar public URL. Enable custom SMTP using Brevo, keep email confirmation enabled, and use eight-digit OTPs with a 600-second expiration. Both signup and magic-link email templates must include {{ .Token }}. Browser sign-out ends this device session and clears private UI state.
+
 ## Verification
 
-TypeScript validation and the production build pass. scripts/check-permissions.mjs exercises the built Worker on http://127.0.0.1:8788 with separate local test identities. It verifies authorization, membership, persistent shares, revoked access, optimistic revision conflicts, search, time-of-day selection and cross-site write rejection. Run it only against this local preview; it creates disposable local data.
+TypeScript validation and the production build pass. scripts/check-auth-identity.mjs checks identity migration, stable ownership and conflicting identities. scripts/check-auth-server.mjs checks that authentication fails closed for unverified/invalid identities. scripts/check-permissions.mjs exercises the built Worker on http://127.0.0.1:8788 with separate local test identities and no Supabase runtime bindings (legacy test mode). It verifies authorization, membership, persistent shares, revoked access, optimistic revision conflicts, search, time-of-day selection and cross-site write rejection. Run it only against this local preview; it creates disposable local data.
 
 The browser flow was checked for profile creation, recipe-form saving, visible saved recipes, search and phone-sized layouts. Both WebMCP actions were checked through the browser’s tool interface, including expected failure paths.
 

@@ -1,4 +1,7 @@
 import {sqliteTable,text,integer,primaryKey,index,uniqueIndex} from 'drizzle-orm/sqlite-core';
+// Stable external identities preserve existing profile IDs and all recipe/kitchen references.
+// A mapping can be created before a new user chooses their profile, so no profile FK here.
+export const authIdentities=sqliteTable('auth_identities',{subject:text('subject').primaryKey(),profileId:text('profile_id').notNull()},t=>[uniqueIndex('idx_auth_identities_profile').on(t.profileId)]);
 export const profiles=sqliteTable('profiles',{id:text('id').primaryKey(),username:text('username').notNull(),email:text('email').notNull(),name:text('name').notNull()},t=>[uniqueIndex('idx_profiles_username').on(t.username),uniqueIndex('idx_profiles_email').on(t.email)]);
 export const kitchens=sqliteTable('kitchens',{id:text('id').primaryKey(),name:text('name').notNull(),owner:text('owner').notNull().references(()=>profiles.id),createdAt:text('created_at').notNull()});
 export const members=sqliteTable('members',{kitchenId:text('kitchen_id').notNull().references(()=>kitchens.id),userId:text('user_id').notNull().references(()=>profiles.id)},t=>[primaryKey({columns:[t.kitchenId,t.userId]}),index('idx_members_user').on(t.userId)]);

@@ -1,13 +1,13 @@
-import {getChatGPTUser} from '@/app/chatgpt-auth';
+import {getAjvarUser,AuthenticationError} from '@/lib/auth-server';
 import {database} from '@/db/raw';
 import {z} from 'zod';
 export const dynamic='force-dynamic';
-const respond=(value:unknown,status=200)=>Response.json(value,{status,headers:{'Cache-Control':'private, no-store','Vary':'Cookie, oai-authenticated-user-id'}});
+const respond=(value:unknown,status=200)=>Response.json(value,{status,headers:{'Cache-Control':'private, no-store','Vary':'Cookie, Authorization, oai-authenticated-user-id'}});
 const idSchema=z.string().min(1).max(100);
 const recipeSchema=z.object({id:z.string().max(100).optional(),revision:z.number().int().nonnegative(),title:z.string().trim().min(2).max(140),description:z.string().trim().max(2000),course:z.enum(['Breakfast','Lunch','Dinner','Snack','Dessert','Side']),cuisine:z.string().trim().max(80),tags:z.string().trim().max(250),ingredients:z.array(z.object({amount:z.string().trim().max(30),unit:z.string().trim().max(30),name:z.string().trim().min(1).max(250)})).min(1).max(100),steps:z.array(z.string().trim().min(1).max(3000)).min(1).max(60),prep:z.number().int().min(0).max(1440),cook:z.number().int().min(0).max(2880),servings:z.number().int().min(1).max(1000),visibility:z.enum(['private','kitchen','public']),kitchenIds:z.array(idSchema).max(30),image:z.string().max(2000).refine(v=>!v||(/^https:\/\//i.test(v)&&URL.canParse(v)),'Use a full https photo URL.')});
-export async function GET(){
+export async function GET(request:Request){
  try{
- const user=await getChatGPTUser();const db=database();const uid=user?.userId??'';
+ const user=await getAjvarUser(request);const db=database();const uid=user?.userId??'';
  const profile=user?await db.prepare('SELECT id,username,name,email FROM profiles WHERE id=?').bind(uid).first():null;
  const ks=user?(await db.prepare('SELECT k.id,k.name,k.owner FROM kitchens k JOIN members m ON m.kitchen_id=k.id WHERE m.user_id=? ORDER BY k.created_at').bind(uid).all()).results:[];
  const memberRows=user?(await db.prepare('SELECT m.kitchen_id,p.id,p.username,p.name FROM members m JOIN profiles p ON p.id=m.user_id WHERE m.kitchen_id IN (SELECT kitchen_id FROM members WHERE user_id=?) ORDER BY p.name').bind(uid).all()).results:[];
@@ -15,7 +15,7 @@ export async function GET(){
  // A visitor sees only share destinations they belong to; authors see all their own destinations.
  const sr=user?(await db.prepare('SELECT s.recipe_id,s.kitchen_id FROM shares s JOIN recipes r ON r.id=s.recipe_id WHERE r.owner=? OR s.kitchen_id IN (SELECT kitchen_id FROM members WHERE user_id=?)').bind(uid,uid).all()).results:[];
  return respond({user:user?{id:uid,email:user.email,name:user.fullName??user.email.split('@')[0]}:null,profile,kitchens:ks.map(k=>({...k,members:memberRows.filter(m=>m.kitchen_id===k.id).map(({kitchen_id,...m})=>m)})),recipes:rows.map(r=>({...JSON.parse(r.data as string),id:r.id,owner:r.owner,title:r.title,description:r.description,course:r.course,visibility:r.visibility,revision:r.revision,author:r.author,createdAt:r.created_at,kitchenIds:sr.filter(s=>s.recipe_id===r.id).map(s=>s.kitchen_id)}))});
- }catch(e){console.error('Ajvar read failed',e);return respond({error:'The kitchen is temporarily unavailable. Please try again.'},503);}
+ }catch(e){if(e instanceof AuthenticationError)return respond({error:'Your session has expired. Please sign in again.'},401);console.error('Ajvar read failed');return respond({error:'The kitchen is temporarily unavailable. Please try again.'},503);}
 }
 export async function POST(request:Request){
  try{
@@ -24,7 +24,7 @@ export async function POST(request:Request){
  if(!request.headers.get('content-type')?.startsWith('application/json'))return respond({error:'A JSON request is required.'},415);
  const raw=await request.text();if(raw.length>180000)return respond({error:'This recipe is too large. Please shorten it.'},413);
  let body;try{body=JSON.parse(raw)}catch{return respond({error:'Invalid request.'},400)}
- const user=await getChatGPTUser();if(!user)return respond({error:'Sign in to save to your kitchen.'},401);
+ const user=await getAjvarUser(request);if(!user)return respond({error:'Sign in to save to your kitchen.'},401);
  const db=database(),uid=user.userId;
  if(body.action==='profile'){
  const p=z.object({username:z.string().trim().toLowerCase().regex(/^[a-z0-9_]{3,24}$/,'Use 3–24 letters, numbers or underscores.'),name:z.string().trim().min(1).max(80)}).parse(body);
@@ -58,5 +58,5 @@ export async function POST(request:Request){
  return respond({ok:true,id},existing?200:201);
  }
  return respond({error:'Unknown action.'},400);
- }catch(e){if(e instanceof z.ZodError)return respond({error:e.issues[0]?.message??'Please check the form.'},400);console.error('Ajvar save failed',e);return respond({error:'We could not save that. Your form is still here; please try again.'},503);}
+ }catch(e){if(e instanceof AuthenticationError)return respond({error:'Your session has expired. Please sign in again.'},401);if(e instanceof z.ZodError)return respond({error:e.issues[0]?.message??'Please check the form.'},400);console.error('Ajvar save failed',e);return respond({error:'We could not save that. Your form is still here; please try again.'},503);}
 }
