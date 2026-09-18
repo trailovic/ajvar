@@ -4,22 +4,24 @@ import {useEffect,useRef,useState} from 'react';
 import {InputOTP,InputOTPGroup,InputOTPSlot} from '@/components/ui/input-otp';
 import {authClient,passwordAuthClient} from '@/lib/auth-client';
 import {minimumPasswordLength,PasswordChange} from '@/lib/password-change';
+import {PasswordRecovery} from '@/lib/password-recovery';
 
-export default function PasswordSettings({email,onBusy,onBack}:{email:string;onBusy:(busy:boolean)=>void;onBack:()=>void}){
+export default function PasswordSettings({email,onBusy,onBack,recovery=false}:{email:string;onBusy:(busy:boolean)=>void;onBack:(email?:string)=>void;recovery?:boolean}){
+ const [address,setAddress]=useState(email);
  const [step,setStep]=useState<'send'|'verify'|'password'|'done'>('send');
  const [code,setCode]=useState(''),[password,setPassword]=useState(''),[confirmation,setConfirmation]=useState('');
  const [showPassword,setShowPassword]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState('');
  const [remaining,setRemaining]=useState(0),[sessionRestored,setSessionRestored]=useState(true);
- const flow=useRef<PasswordChange|null>(null),working=useRef(false),mounted=useRef(true);
+ const flow=useRef<PasswordChange|PasswordRecovery|null>(null),working=useRef(false),mounted=useRef(true);
  useEffect(()=>{mounted.current=true;return()=>{mounted.current=false;void flow.current?.dispose();};},[]);
  useEffect(()=>{if(!remaining)return;const timer=setTimeout(()=>setRemaining(n=>Math.max(0,n-1)),1000);return()=>clearTimeout(timer);},[remaining]);
 
  const getFlow=async()=>{
   if(flow.current)return flow.current;
-  const primary=await authClient();
-  if(!primary)throw Error('Password settings are temporarily unavailable.');
   const isolated=await passwordAuthClient();
-  const next=new PasswordChange(primary,isolated,email);
+  const primary=recovery?null:await authClient();
+  if(!recovery&&!primary)throw Error('Password settings are temporarily unavailable.');
+  const next=recovery?new PasswordRecovery(isolated,address):new PasswordChange(primary!,isolated,email);
   if(!mounted.current){await next.dispose();throw Error('Password settings were closed.');}
   flow.current=next;
   return next;
@@ -47,11 +49,12 @@ export default function PasswordSettings({email,onBusy,onBack}:{email:string;onB
  const goBack=()=>{
   setPassword('');setConfirmation('');setShowPassword(false);setCode('');setError('');setStep('verify');
  };
- return <form className="simple-form email-signin" aria-label="Password settings" aria-busy={busy} onSubmit={event=>{event.preventDefault();void(step==='send'?send():step==='verify'?verify():step==='password'?save():Promise.resolve());}}>
+ return <form className="simple-form email-signin" aria-label={recovery?'Password recovery':'Password settings'} aria-busy={busy} onSubmit={event=>{event.preventDefault();void(step==='send'?send():step==='verify'?verify():step==='password'?save():Promise.resolve());}}>
   <fieldset disabled={busy}>
-   {step==='send'&&<p className="code-message">First, confirm it’s you. We’ll send a fresh verification code to <strong>{email}</strong>. You can keep using email codes after setting a password.</p>}
+   {step==='send'&&recovery&&<><p className="code-message">Reset your password</p><label>Account email<input type="email" autoComplete="email" value={address} onChange={event=>{setAddress(event.target.value);if(flow.current){void flow.current.dispose();flow.current=null;}}} required maxLength={254} autoFocus/></label><p className="form-help">We’ll email you a code so you can choose a new password.</p></>}
+   {step==='send'&&!recovery&&<p className="code-message">First, confirm it’s you. We’ll send a fresh verification code to <strong>{email}</strong>. You can keep using email codes after setting a password.</p>}
    {step==='verify'&&<>
-    <p className="code-message">Enter the code sent to <strong>{email}</strong>.</p>
+    <p className="code-message">{recovery?'If an account exists for this email, we’ve sent a recovery code to ':'Enter the code sent to '}<strong>{recovery?address.trim():email}</strong>.</p>
     <label htmlFor="password-code">Your verification code</label>
     <InputOTP id="password-code" maxLength={8} pattern="^[0-9]*$" inputMode="numeric" autoComplete="one-time-code" value={code} onChange={setCode} autoFocus containerClassName="code-input"><InputOTPGroup>{[0,1,2,3,4,5,6,7].map(i=><InputOTPSlot index={i} key={i}/>)}</InputOTPGroup></InputOTP>
     <p className="form-help">Your code expires in 10 minutes. Check your spam folder too.</p>
@@ -63,12 +66,12 @@ export default function PasswordSettings({email,onBusy,onBack}:{email:string;onB
     <button type="button" className="text-button password-visibility" aria-pressed={showPassword} onClick={()=>setShowPassword(value=>!value)}>{showPassword?'Hide passwords':'Show passwords'}</button>
     <p id="new-password-help" className="form-help">Use at least 12 characters. A long, unique passphrase works well.</p>
    </>}
-   {step==='done'&&<div role="status"><p className="code-message">Your password is saved.</p><p className="form-help">You can now log in with your password or an email code.</p>{!sessionRestored&&<p className="form-help">Your password was saved, but we couldn’t refresh this session. Please sign in again with your new password or an email code.</p>}</div>}
+   {step==='done'&&<div role="status"><p className="code-message">Your password is saved.</p><p className="form-help">You can now log in with your password or an email code.</p>{!recovery&&!sessionRestored&&<p className="form-help">Your password was saved, but we couldn’t refresh this session. Please sign in again with your new password or an email code.</p>}</div>}
    {error&&<p className="form-error" role="alert">{error}</p>}
    {step!=='done'&&<button type="submit" className="button primary" disabled={busy||(step==='verify'&&code.length!==8)}>{busy?'Please wait…':step==='send'?'Email me a verification code':step==='verify'?'Verify email':'Save password'}</button>}
    {step==='verify'&&<div className="code-actions"><button type="button" className="text-button" disabled={remaining>0} onClick={()=>void send()}>{remaining?'Resend in '+remaining+'s':'Resend code'}</button></div>}
    {step==='password'&&<button type="button" className="text-button auth-switch" onClick={goBack}>Verify again</button>}
-   <button type="button" className={step==='done'?'button primary':'signout-link'} onClick={onBack}>Back to account</button>
+   <button type="button" className={step==='done'?'button primary':'signout-link'} onClick={()=>onBack(recovery?address.trim().toLowerCase():undefined)}>{recovery?'Back to login':'Back to account'}</button>
   </fieldset>
  </form>;
 }

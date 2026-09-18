@@ -4,8 +4,9 @@ import {useEffect,useRef,useState} from 'react';
 import {InputOTP,InputOTPGroup,InputOTPSlot} from '@/components/ui/input-otp';
 import {authClient} from '@/lib/auth-client';
 import {minimumPasswordLength} from '@/lib/password-change';
+import PasswordSettings from './password-settings';
 
-type Mode='login'|'register'|'code';
+type Mode='login'|'register'|'code'|'recovery';
 type PendingCode={email:string;kind:'signup'|'email'};
 
 
@@ -101,6 +102,7 @@ export default function EmailSignIn({onSignedIn,onBusy}:{onSignedIn:()=>Promise<
  });
 
  const label=authenticated?'Continue to Ajvar':pending?'Verify email':mode==='register'?'Create account':mode==='code'?'Email me a code':'Log in';
+ if(mode==='recovery')return <PasswordSettings recovery email={email} onBusy={onBusy} onBack={address=>{if(address)setEmail(address);switchMode('login');}}/>;
  return <form className="simple-form email-signin" aria-label="Ajvar sign-in" aria-busy={busy} onSubmit={event=>{event.preventDefault();void submit();}}>
   <fieldset disabled={busy}>
    {authenticated?<p className="form-help" role="status">You’re signed in. Continue to load your kitchen.</p>:pending?<>
@@ -123,6 +125,7 @@ export default function EmailSignIn({onSignedIn,onBusy}:{onSignedIn:()=>Promise<
     <div className="code-actions"><button type="button" className="text-button" disabled={remaining>0} onClick={()=>void resend()}>{remaining?'Resend in '+remaining+'s':'Resend code'}</button><button type="button" className="text-button" onClick={()=>switchMode(mode)}>Use another email</button></div>
     {pending.kind==='signup'&&<button type="button" className="text-button auth-switch" onClick={()=>switchMode('login')}>Already have an account? Log in</button>}
    </>:<div className="auth-options">
+    {mode==='login'&&<button type="button" className="text-button auth-switch" onClick={()=>switchMode('recovery')}>Forgot password?</button>}
     {mode!=='code'&&<button type="button" className="button outline" onClick={()=>switchMode('code')}>Email me a code instead</button>}
     {mode==='login'?<button type="button" className="text-button auth-switch" onClick={()=>switchMode('register')}>New here? Create an account</button>:<button type="button" className="text-button auth-switch" onClick={()=>switchMode('login')}>Log in with a password</button>}
     {mode==='code'&&<p className="form-help">New here? You’ll choose a username after verifying your email. Already have an Ajvar account? Use the same email to keep your recipes.</p>}
