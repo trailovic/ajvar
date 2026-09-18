@@ -3,10 +3,11 @@
 import {useEffect,useRef,useState} from 'react';
 import {InputOTP,InputOTPGroup,InputOTPSlot} from '@/components/ui/input-otp';
 import {authClient} from '@/lib/auth-client';
+import {minimumPasswordLength} from '@/lib/password-change';
 
 type Mode='login'|'register'|'code';
 type PendingCode={email:string;kind:'signup'|'email'};
-const minimumPasswordLength=12;
+
 
 export default function EmailSignIn({onSignedIn,onBusy}:{onSignedIn:()=>Promise<void>;onBusy:(busy:boolean)=>void}){
  const [mode,setMode]=useState<Mode>('login');

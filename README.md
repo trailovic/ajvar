@@ -34,16 +34,21 @@ Copy .env.example to .env.local for local auth settings. Set production runtime 
 
 ## Password authentication development
 
-The first step on `feat/password-auth` adds password login and registration to the account dialog. Password registration requires at least 12 characters in the form, then uses the existing email-code verification and username setup. Login accepts existing passwords without applying the new-registration minimum. Signup confirmation codes use Supabase's signup resend API; passwordless codes retain the existing OTP flow. Passwords are sent only to Supabase and are cleared from form state after successful authentication, signup, or switching methods. D1 profiles, identities, recipe ownership and kitchen membership are unchanged.
+The `feat/password-auth` branch adds password login, registration and password settings to the account dialog. Password registration requires at least 12 characters in the form, then uses the existing email-code verification and username setup. Login accepts existing passwords without applying the new-registration minimum. Signup confirmation codes use Supabase's signup resend API; passwordless codes retain the existing OTP flow. Passwords are sent only to Supabase and are cleared from form state after successful authentication, signup, or switching methods. D1 profiles, identities, recipe ownership and kitchen membership are unchanged.
 
 This is an incremental feature branch, not ready for release. Remaining steps:
 
-- Add password setup/change for existing accounts with appropriate reauthentication.
 - Add password recovery and deliberate recovery-session handling.
 - Verify live Supabase email confirmation, eight-digit templates, SMTP delivery, rate limits and a server-side password minimum of at least 12 characters. The browser minimum is a usability check, not the security policy.
 - Test both methods against the same real account, including account ownership, registration, resends, expired codes, recovery and logout before merging or deploying.
 
-Until password management is added, existing code-only users should continue choosing **Email me a code instead**. Do not register again to add a password. Users who forget a password can still access their account with an email code.
+Existing users can sign in with either method, open **My account → Set or change password**, request a fresh eight-digit code, verify it, and enter their new password twice. Code-only users do not need to register again. Email-code login remains available after setting or changing a password.
+
+Password settings use a separate, in-memory Supabase client with persistence and automatic refresh disabled. Code requests use `shouldCreateUser: false`. The verified Supabase subject and confirmed email must match the original account, and the current account is checked again before saving. Verification expires locally after ten minutes. After saving, the verified session transfers to the main client; cancelling revokes only the temporary session. A session-handoff failure is reported separately from a successful password save. No password or verification code is stored in D1, application logs or browser storage.
+
+The app explicitly verifies an email OTP before allowing a password change through this UI. Also enable Supabase's **Secure password change / Require reauthentication** policy for provider-side protection; its built-in check exempts sessions created within the last 24 hours. This UI does not change that provider policy. Check whether **Require current password** is enabled: that additional policy requires a current-password input and is not implemented by this email-verification flow. These settings must be checked in the actual project before release.
+
+Run `node scripts/check-password-change.mjs` for mocked-provider regression checks covering account binding, invalid codes, expiration, resends, password-policy failures, cancellation and session handoff. Live verification should cover both an existing code-only account and a password account: set/change the password, log out, log in with the new password, confirm the old password fails after a change, and confirm email-code login still opens the same recipes and kitchens.
 
 ## Verification
 
