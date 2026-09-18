@@ -10,6 +10,8 @@
 
 
 .email-signin .code-message{font-size:15px;overflow-wrap:anywhere}.email-signin .code-input{margin:15px 0}.email-signin [data-slot=input-otp-slot]{width:42px;height:50px;font-size:23px;background:#fffefa}.email-signin input[data-slot=input-otp]{margin:0;border:0;padding:0;min-height:0;box-shadow:none}.code-actions{display:flex;justify-content:space-between;gap:15px;margin:20px 0 6px}.code-actions .text-button:disabled{cursor:default}.simple-form button.signout-link{width:100%}
+.email-signin .auth-options{display:grid;gap:16px;margin-top:16px}.email-signin .auth-options .button{width:100%;margin:0}.email-signin .auth-switch{justify-content:center;width:100%;white-space:normal;text-align:center;line-height:1.5}.email-signin .password-visibility{display:flex;margin:8px 0 16px auto}.email-signin .auth-options .form-help{margin:0}.email-signin button:focus-visible{outline:2px solid var(--primary);outline-offset:4px}.email-signin .code-actions{flex-wrap:wrap}
+.simple-form .account-password-button{width:100%;margin-top:16px;white-space:normal}
 
 @media(max-width:450px){.email-signin [data-slot=input-otp-slot]{width:32px;height:44px;font-size:20px}}
 

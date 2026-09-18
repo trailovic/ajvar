@@ -4,7 +4,7 @@ A family recipe hub built with React, Vinext, Cloudflare Workers and D1.
 
 ## Features
 
-- Sign in with an eight-digit email code and choose a unique Ajvar username. Supabase manages authentication; Brevo delivers codes.
+- Sign in with a password or an eight-digit email code and choose a unique Ajvar username. Supabase manages authentication; Brevo delivers codes.
 - Create kitchens and add existing Ajvar accounts by username or account email.
 - Create and edit recipes with ingredient rows, ordered steps, meal course, cuisine, tags, cooking times, servings and an optional HTTPS photo URL.
 - Keep recipes private, share with selected kitchens, or publish them to Home. Public recipes may also belong to selected kitchens.
@@ -31,6 +31,33 @@ Generate migrations with npm run db:generate after changing db/schema.ts. Build 
 ## Email configuration
 
 Copy .env.example to .env.local for local auth settings. Set production runtime values through Sites. Supabase Site URL must be the Ajvar public URL. Enable custom SMTP using Brevo, keep email confirmation enabled, and use eight-digit OTPs with a 600-second expiration. Both signup and magic-link email templates must include {{ .Token }}. Browser sign-out ends this device session and clears private UI state.
+
+## Password authentication development
+
+The `feat/password-auth` branch adds password login, registration, password settings and email-code recovery to the account dialog. Password registration requires at least 12 characters in the form, then uses the existing email-code verification and username setup. Login accepts existing passwords without applying the new-registration minimum. Signup confirmation codes use Supabase's signup resend API; passwordless codes retain the existing OTP flow. Passwords are sent only to Supabase and are cleared from form state after successful authentication, signup, or switching methods. D1 profiles, identities, recipe ownership and kitchen membership are unchanged.
+
+This is an incremental feature branch, not ready for release. Remaining steps:
+
+- Verify live Supabase email confirmation, eight-digit templates, SMTP delivery, rate limits and a server-side password minimum of at least 12 characters. The browser minimum is a usability check, not the security policy.
+- Test both methods against the same real account, including account ownership, registration, resends, expired codes, recovery and logout before merging or deploying.
+
+Existing users can sign in with either method, open **My account → Set or change password**, request a fresh eight-digit code, verify it, and enter their new password twice. Code-only users do not need to register again. Email-code login remains available after setting or changing a password.
+
+Password settings use a separate, in-memory Supabase client with persistence and automatic refresh disabled. Code requests use `shouldCreateUser: false`. The verified Supabase subject and confirmed email must match the original account, and the current account is checked again before saving. Verification expires locally after ten minutes. After saving, the verified session transfers to the main client; cancelling revokes only the temporary session. A session-handoff failure is reported separately from a successful password save. No password or verification code is stored in D1, application logs or browser storage.
+
+The app explicitly verifies an email OTP before allowing a password change through this UI. Also enable Supabase's **Secure password change / Require reauthentication** policy for provider-side protection; its built-in check exempts sessions created within the last 24 hours. This UI does not change that provider policy. Check whether **Require current password** is enabled: that additional policy requires a current-password input and is not implemented by this email-verification flow. These settings must be checked in the actual project before release.
+
+Run `node scripts/check-password-change.mjs` for mocked-provider regression checks covering account binding, invalid codes, expiration, resends, password-policy failures, cancellation and session handoff. Live verification should cover both an existing code-only account and a password account: set/change the password, log out, log in with the new password, confirm the old password fails after a change, and confirm email-code login still opens the same recipes and kitchens.
+
+## Password recovery
+
+The login form includes **Forgot password?**. Recovery requests use Supabase `resetPasswordForEmail`, then verify the emailed eight-digit code with `type: 'recovery'`. No account is created by this flow. After verification, the user enters and confirms a new password, then returns to login with their email prefilled. The temporary recovery session is never adopted into the app's main client. It is revoked locally on completion or cancellation; the app does not replace another tab's active identity. Supabase's own session-revocation policy still applies when a password changes.
+
+**Required Supabase setup before testing recovery:** in the project's authentication email templates, open **Reset password**. Set the subject to `Reset your Ajvar password`, and paste the body from [`supabase/templates/recovery.html`](supabase/templates/recovery.html). It must contain `{{ .Token }}`. The default link-only reset email will not work with this code-entry flow. Keep the existing eight-digit OTP length and 600-second expiry. This file is a template to copy into Supabase; committing it does not update the live dashboard.
+
+Recovery deliberately uses code entry, so no callback route or automatic URL-session detection is needed. Keep `detectSessionInUrl: false`. Ordinary sign-in codes are not accepted as recovery codes. Unknown accounts receive the same on-screen request confirmation; invalid or expired codes cannot open the new-password form. A completed reset still succeeds if best-effort session cleanup fails.
+
+Run `node scripts/check-password-recovery.mjs` for provider-mocked checks. For live verification: log out, choose **Forgot password?**, verify the actual recovery email's code, set a new password, return to login, and confirm the new password works while the old one fails. Also check invalid/expired codes, resend, cancellation, and that email-code login still opens the same recipes and kitchens. Try an unused email to confirm the UI does not reveal account existence. Never use another person's address for testing.
 
 ## Verification
 
