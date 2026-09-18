@@ -4,7 +4,7 @@ A family recipe hub built with React, Vinext, Cloudflare Workers and D1.
 
 ## Features
 
-- Sign in with an eight-digit email code and choose a unique Ajvar username. Supabase manages authentication; Brevo delivers codes.
+- Sign in with a password or an eight-digit email code and choose a unique Ajvar username. Supabase manages authentication; Brevo delivers codes.
 - Create kitchens and add existing Ajvar accounts by username or account email.
 - Create and edit recipes with ingredient rows, ordered steps, meal course, cuisine, tags, cooking times, servings and an optional HTTPS photo URL.
 - Keep recipes private, share with selected kitchens, or publish them to Home. Public recipes may also belong to selected kitchens.
@@ -31,6 +31,19 @@ Generate migrations with npm run db:generate after changing db/schema.ts. Build 
 ## Email configuration
 
 Copy .env.example to .env.local for local auth settings. Set production runtime values through Sites. Supabase Site URL must be the Ajvar public URL. Enable custom SMTP using Brevo, keep email confirmation enabled, and use eight-digit OTPs with a 600-second expiration. Both signup and magic-link email templates must include {{ .Token }}. Browser sign-out ends this device session and clears private UI state.
+
+## Password authentication development
+
+The first step on `feat/password-auth` adds password login and registration to the account dialog. Password registration requires at least 12 characters in the form, then uses the existing email-code verification and username setup. Login accepts existing passwords without applying the new-registration minimum. Signup confirmation codes use Supabase's signup resend API; passwordless codes retain the existing OTP flow. Passwords are sent only to Supabase and are cleared from form state after successful authentication, signup, or switching methods. D1 profiles, identities, recipe ownership and kitchen membership are unchanged.
+
+This is an incremental feature branch, not ready for release. Remaining steps:
+
+- Add password setup/change for existing accounts with appropriate reauthentication.
+- Add password recovery and deliberate recovery-session handling.
+- Verify live Supabase email confirmation, eight-digit templates, SMTP delivery, rate limits and a server-side password minimum of at least 12 characters. The browser minimum is a usability check, not the security policy.
+- Test both methods against the same real account, including account ownership, registration, resends, expired codes, recovery and logout before merging or deploying.
+
+Until password management is added, existing code-only users should continue choosing **Email me a code instead**. Do not register again to add a password. Users who forget a password can still access their account with an email code.
 
 ## Verification
 
