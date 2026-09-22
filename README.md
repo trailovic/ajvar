@@ -9,6 +9,7 @@ A family recipe hub built with React, Vinext, Cloudflare Workers and D1.
 - Create and edit recipes with ingredient rows, ordered steps, meal course, cuisine, tags, cooking times, servings and an optional HTTPS photo URL.
 - Keep recipes private, share with selected kitchens, or publish them to Home. Public recipes may also belong to selected kitchens.
 - Kitchen shares persist across recipe edits until the author changes them. Saving privately removes all kitchen shares.
+- Owners can enable an unlisted recipe link without changing visibility. Anyone with the link can read the recipe without an account; private recipes stay out of Home and public search.
 - Search permitted recipes by title, description, ingredients, cuisine and tags. Home prioritizes the meal course appropriate to the visitor’s local time.
 - Three clearly credited starter recipes provide inspiration before family recipes are added.
 
@@ -27,6 +28,39 @@ D1 stores accounts, external identity mappings, kitchens, members, recipes and r
 Use Node 22.13 or later, the committed package-lock.json, and npm run dev. The portable preview supports a local-only simulated sign-in as Seedy. When SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY are configured, email auth replaces the simulated/legacy login. The public runtime configuration endpoint exposes only the Supabase URL and publishable key. Never configure a Supabase secret/service-role key in this app. Store Brevo SMTP credentials only in Supabase Auth settings. Without both auth settings, the original Sites login remains as a deployment fallback.
 
 Generate migrations with npm run db:generate after changing db/schema.ts. Build with npm run build. Apply new local migrations through Wrangler using the built dist/server/wrangler.json configuration and .wrangler/state persistence directory.
+
+## Recipe share links
+
+Open a saved recipe, choose **Share recipe → Enable share link → Copy link**. Only the author can enable, retrieve or disable the unlisted link. Sharing is off until explicitly enabled. A link gives read-only access to the current recipe (including future edits), not the author's account or kitchen. The API returns only cooking content and the author's display name. Recipients can forward the URL. Do not use links for information that must remain confidential to named recipients.
+
+**Disable link** invalidates the URL on subsequent requests. Enabling sharing again creates a different, random 256-bit token; previous links stay invalid. Disabling cannot retract screenshots, downloaded content or a recipe already open on a recipient's screen. Changing visibility does not revoke an enabled unlisted link; use **Disable link** explicitly. Public recipes and starter recipes can also be shared by visitors; those public-only links stop working if a saved recipe is made private. Revoking an owner's unlisted link does not unpublish an otherwise public recipe.
+
+Shared pages request `noindex`, `nofollow` and `noarchive` and use a no-referrer policy. These are crawler directives, not a guarantee that someone cannot republish the content. Recipe content comes from an uncached endpoint; the initial page HTML contains no private recipe content. No account is required by either the page or read endpoint. The hosting audience must also permit anonymous visitors; an externally private deployment still has its own sign-in gate. This branch does not change hosting access policies.
+
+### Run and verify locally
+
+Use Node 22.13+ and install with the existing lockfile. Build first to generate Wrangler's configuration, then apply the new **local-only** migration before starting development:
+
+```bash
+npm ci
+npm run build
+npx wrangler d1 migrations apply DB --local --config dist/server/wrangler.json --persist-to .wrangler/state
+npm run dev
+```
+
+Open the local address printed by the dev server (normally `http://localhost:5173`). Keep existing Supabase local settings if you already use them. Local data is separate from production; if needed, create a disposable local recipe. To test sharing:
+
+1. Create a private recipe; enable its share link and copy it.
+2. Paste it into a private/incognito window. Verify the recipe opens without signing in, including ingredient checkboxes.
+3. Visit Home in that window and search for its title. It must not appear.
+4. Edit the recipe as its author. Reload the link to see the updated content.
+5. Disable the link and reload the incognito window. It must show “Recipe unavailable”.
+6. Enable a new link. Confirm the new one works and the old one still fails.
+7. Check a public recipe and a kitchen recipe too. Kitchen members cannot enable or retrieve the owner's unlisted link.
+
+Run `node scripts/check-recipe-sharing.mjs` for isolated SQLite-backed route checks (no production credentials or data), and `npx tsc --noEmit` for type checking. Clipboard copying requires HTTPS or localhost; otherwise a selectable URL is shown for manual copying.
+
+The additive `drizzle/0002_nifty_patch.sql` migration creates `recipe_links`; it does not alter recipes or their visibility. Apply this migration before deploying the new code. The Sites publishing flow applies committed migrations; deployments outside Sites must apply them through their existing D1 release workflow. Do not run local test/seed scripts against production.
 
 ## Email configuration
 

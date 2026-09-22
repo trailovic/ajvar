@@ -15,6 +15,10 @@
 
 @media(max-width:450px){.email-signin [data-slot=input-otp-slot]{width:32px;height:44px;font-size:20px}}
 
+/* Link sharing uses the existing recipe typography and surfaces. */
+.recipe-sharing{margin:8px 0 16px}.share-panel{margin-top:14px;padding:20px;border:1px solid var(--border);border-radius:10px;background:var(--card)}.share-panel h2{display:flex;align-items:center;gap:8px;font-size:24px;margin:0 0 10px}.share-panel p{font-size:14px;line-height:1.6}.share-link-label{display:block;font-size:14px;font-weight:600}.share-link-label input{display:block;width:100%;min-width:0;margin:8px 0 12px;padding:12px;border:1px solid var(--input);border-radius:7px;font:14px Arial,Helvetica,sans-serif;background:var(--background)}.share-actions{display:flex;flex-wrap:wrap;align-items:center;gap:16px}.share-revoke{margin-top:16px;padding-top:12px;border-top:1px solid var(--border)}.shared-recipe-content{max-width:900px;margin:auto;padding:44px 24px}.shared-recipe-content h1{overflow-wrap:anywhere}.shared-recipe-content .recipe-category{margin-top:20px}.shared-recipe-content .detail-photo{height:auto;max-height:440px;margin-bottom:22px}.shared-recipe-content .detail-meta{margin-top:16px}.shared-copy{margin-top:22px}.shared-recipe-content .recipe-instructions{margin-top:26px}.shared-recipe-content .method p,.shared-recipe-content .ingredient-checks>label{font-size:16px}.shared-description{white-space:pre-line}.shared-author{font-size:14px}.shared-recipe-content .method p,.shared-recipe-content .ingredient-checks span{overflow-wrap:anywhere}.shared-recipe-page .topbar{flex-wrap:nowrap}.shared-recipe-page .topbar .text-button{flex-shrink:0}
+@media(max-width:650px){.shared-recipe-content{padding:28px 20px}.shared-recipe-content .recipe-instructions{grid-template-columns:1fr}.share-panel{padding:16px}.share-link-label input{font-size:16px}.shared-recipe-page .topbar{padding-bottom:17px}}
+
 /* The same navigation stays in the header on desktop and floats on phones. */
 .navtabs .nav-icon{display:none}
 @media(max-width:650px){
