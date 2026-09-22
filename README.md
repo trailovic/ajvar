@@ -60,7 +60,7 @@ Open the local address printed by the dev server (normally `http://localhost:517
 
 Run `node scripts/check-recipe-sharing.mjs` for isolated SQLite-backed route checks (no production credentials or data), and `npx tsc --noEmit` for type checking. Clipboard copying requires HTTPS or localhost; otherwise a selectable URL is shown for manual copying.
 
-The additive `drizzle/0002_nifty_patch.sql` migration creates `recipe_links`; it does not alter recipes or their visibility. Apply this migration before deploying the new code. The Sites publishing flow applies committed migrations; deployments outside Sites must apply them through their existing D1 release workflow. Do not run local test/seed scripts against production.
+The additive `drizzle/0002_nifty_patch.sql` migration creates `recipe_links`; it does not alter recipes or their visibility. `npm run deploy` now builds the Worker, applies all pending production D1 migrations, then deploys the Worker. To repair a deployment where the sharing code was released before this table, run `npm run build` followed by `npm run db:migrate:remote`; redeploying is unnecessary when the live code is already current. The Sites publishing flow also applies committed migrations. Do not run local test/seed scripts against production.
 
 ## Email configuration
 

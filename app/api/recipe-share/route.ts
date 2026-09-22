@@ -40,7 +40,7 @@ export async function POST(request: Request) {
   } catch (error) {
     if (error instanceof AuthenticationError) return respond({error: 'Your session has expired. Please sign in again.'}, 401);
     if (error instanceof z.ZodError) return respond({error: 'Invalid sharing request.'}, 400);
-    console.error('Recipe link operation failed');
+    console.error('Recipe link operation failed', error);
     return respond({error: 'Sharing is temporarily unavailable. Please try again.'}, 503);
   }
 }
